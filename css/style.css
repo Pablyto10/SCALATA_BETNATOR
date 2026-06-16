@@ -1,0 +1,7 @@
+body{background:#0f172a;color:white;font-family:Arial;margin:0;padding:20px}
+.cards{display:flex;gap:15px}
+.card,.panel{background:#1e293b;padding:15px;border-radius:10px}
+table{width:100%;margin-top:20px;border-collapse:collapse}
+td,th{border:1px solid #334155;padding:8px}
+input,button{margin:5px;padding:8px}
+canvas{margin-top:20px;background:white;border-radius:10px}
