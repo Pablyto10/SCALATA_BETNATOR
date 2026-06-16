@@ -2,34 +2,145 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tracker Scalate Pro</title>
-<link rel="stylesheet" href="css/style.css">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bankroll Tracker Pro</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body{margin:0;background:#0b1220;color:#fff;font-family:Arial}
+.header{padding:20px;background:#111b2e}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:15px}
+.card,.panel{background:#162238;border-radius:12px;padding:15px}
+.panel{margin:15px}
+input,select,button{padding:10px;margin:4px;border-radius:8px;border:none}
+button{cursor:pointer}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid #2c3b58;text-align:left}
+.win{background:#1d6b3a;color:#fff}
+.loss{background:#8b2020;color:#fff}
+.void{background:#666;color:#fff}
+</style>
 </head>
 <body>
-<header><h1>Tracker Scalate Pro</h1></header>
-<div class="cards">
-<div class="card"><h3>Capitale</h3><span id="capitale">0 €</span></div>
-<div class="card"><h3>Profitto</h3><span id="profitto">0 €</span></div>
-<div class="card"><h3>ROI</h3><span id="roi">0%</span></div>
+<div class="header"><h1>Bankroll Tracker Pro</h1></div>
+
+<div class="grid">
+<div class="card">Cassa Iniziale<br><b id="start">0 €</b></div>
+<div class="card">Cassa Attuale<br><b id="current">0 €</b></div>
+<div class="card">Profitto<br><b id="profit">0 €</b></div>
+<div class="card">ROI<br><b id="roi">0%</b></div>
+<div class="card">Win Rate<br><b id="wr">0%</b></div>
 </div>
 
-<section class="panel">
-<h2>Nuovo Step</h2>
+<div class="panel">
+<h3>Configurazione Cassa</h3>
+<input id="bankroll" type="number" placeholder="Cassa iniziale">
+<button onclick="setBankroll()">Salva</button>
+
+<button onclick="resetTracker()" style="background:#b91c1c;color:white;">
+🗑️ Azzera Tutto
+</button>
+
+</div>
+
+<div class="panel">
+<h3>Nuova Scommessa</h3>
 <input id="evento" placeholder="Evento">
+<input id="campionato" placeholder="Campionato">
+<input id="mercato" placeholder="Mercato">
 <input id="quota" type="number" step="0.01" placeholder="Quota">
 <input id="stake" type="number" step="0.01" placeholder="Stake">
-<button onclick="addStep()">Aggiungi</button>
-</section>
+<button onclick="addBet()">Aggiungi</button>
+</div>
 
+<div class="panel">
 <table>
-<thead><tr><th>Evento</th><th>Quota</th><th>Stake</th></tr></thead>
+<thead>
+<tr><th>Data</th><th>Evento</th><th>Campionato</th><th>Mercato</th><th>Quota</th><th>Stake</th><th>Esito</th><th>Profitto</th><th>Azioni</th></tr>
+</thead>
 <tbody id="rows"></tbody>
 </table>
+</div>
 
-<canvas id="bankrollChart"></canvas>
+<div class="panel"><canvas id="chart"></canvas></div>
 
-<script src="js/app.js"></script>
+<script>
+let state=JSON.parse(localStorage.getItem("bankrollTracker")||'{"start":0,"bets":[]}');
+
+function save(){localStorage.setItem("bankrollTracker",JSON.stringify(state));}
+function setBankroll(){
+ state.start=parseFloat(document.getElementById("bankroll").value||0);
+ save(); render();
+}
+function addBet(){
+ state.bets.push({
+  date:new Date().toLocaleDateString(),
+  evento:evento.value,
+  campionato:campionato.value,
+  mercato:mercato.value,
+  quota:parseFloat(quota.value),
+  stake:parseFloat(stake.value),
+  esito:"APERTO",
+  profitto:0
+ });
+ save(); render();
+}
+function setResult(i,res){
+ let b=state.bets[i];
+ b.esito=res;
+ if(res==="VINTA") b.profitto=(b.stake*(b.quota-1));
+ if(res==="PERSA") b.profitto=(-b.stake);
+ if(res==="VOID") b.profitto=0;
+ save(); render();
+}
+
+function resetTracker(){
+ if(!confirm("Sei sicuro di voler eliminare tutte le scommesse e azzerare la cassa?")) return;
+ localStorage.removeItem("bankrollTracker");
+ state={start:0,bets:[]};
+ render();
+ alert("Tracker azzerato con successo.");
+}
+
+function render(){
+ document.getElementById("start").innerText=state.start.toFixed(2)+" €";
+ let profit=state.bets.reduce((a,b)=>a+b.profitto,0);
+ let current=state.start+profit;
+ document.getElementById("current").innerText=current.toFixed(2)+" €";
+ document.getElementById("profit").innerText=profit.toFixed(2)+" €";
+
+ let settled=state.bets.filter(x=>x.esito==="VINTA"||x.esito==="PERSA");
+ let wins=settled.filter(x=>x.esito==="VINTA").length;
+ let wr=settled.length?(wins/settled.length*100):0;
+ document.getElementById("wr").innerText=wr.toFixed(1)+"%";
+ let stakes=state.bets.reduce((a,b)=>a+b.stake,0);
+ let roi=stakes?(profit/stakes*100):0;
+ document.getElementById("roi").innerText=roi.toFixed(1)+"%";
+
+ let rows=document.getElementById("rows");
+ rows.innerHTML="";
+ state.bets.forEach((b,i)=>{
+ rows.innerHTML+=`<tr>
+ <td>${b.date}</td><td>${b.evento}</td><td>${b.campionato}</td>
+ <td>${b.mercato}</td><td>${b.quota}</td><td>${b.stake}</td>
+ <td>${b.esito}</td><td>${b.profitto.toFixed(2)} €</td>
+ <td>
+ <button class="win" onclick="setResult(${i},'VINTA')">✅</button>
+ <button class="loss" onclick="setResult(${i},'PERSA')">❌</button>
+ <button class="void" onclick="setResult(${i},'VOID')">🔄</button>
+ </td></tr>`;
+ });
+
+ let running=state.start;
+ let points=[running];
+ state.bets.forEach(b=>{running+=b.profitto;points.push(running);});
+
+ if(window.myChart) window.myChart.destroy();
+ myChart=new Chart(document.getElementById('chart'),{
+ type:'line',
+ data:{labels:points.map((_,i)=>i),datasets:[{label:'Cassa',data:points}]}
+ });
+}
+render();
+</script>
 </body>
 </html>
